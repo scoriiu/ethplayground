@@ -98,7 +98,9 @@ describe('Lottery', () => {
 
 		for(var i = 0; i < balancesAfter; i++) {
 			assert.ok((balancesBefore[i] > (balancesAfter[i] + 0.99)) ||
-					  (balancesBefore[i] < (balancesAfter[i] + 1.99)))
+					  ((balancesBefore[i] > (balancesAfter[i] + 0.99)) &
+					   (balancesBefore[i] < (balancesAfter[i] + 1.99)))
+			);
 		}
 
 		const players = await lottery.methods.getPlayers().call();
