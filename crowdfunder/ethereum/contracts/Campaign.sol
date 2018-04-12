@@ -3,12 +3,12 @@ pragma solidity ^0.4.17;
 contract CampaignFactory {
     address[] public deployedCampaigns;
 
-    function createCampaign(uint minimumToRaise) public {
-        address newCampaign = new Campaign(msg.sender, minimumToRaise);
+    function createCampaign(uint minimum) public {
+        address newCampaign = new Campaign(minimum, msg.sender);
         deployedCampaigns.push(newCampaign);
     }
 
-    function getDeployedCampaigns() public view returns(address[]) {
+    function getDeployedCampaigns() public view returns (address[]) {
         return deployedCampaigns;
     }
 }
@@ -16,25 +16,25 @@ contract CampaignFactory {
 contract Campaign {
     struct Request {
         string description;
-        uint amount;
+        uint value;
         address recipient;
-        bool completed;
+        bool complete;
         uint approvalCount;
-        mapping(address => bool) approvers;
+        mapping(address => bool) approvals;
     }
 
+    Request[] public requests;
     address public manager;
     uint public minimumContribution;
-    mapping(address => bool) public contributors;
-    uint public contributorsCount;
-    Request[] public requests;
+    mapping(address => bool) public approvers;
+    uint public approversCount;
 
-    modifier isCreator () {
+    modifier restricted() {
         require(msg.sender == manager);
         _;
     }
 
-    function Campaign(address creator, uint minimum) public {
+    function Campaign(uint minimum, address creator) public {
         manager = creator;
         minimumContribution = minimum;
     }
@@ -42,59 +42,55 @@ contract Campaign {
     function contribute() public payable {
         require(msg.value > minimumContribution);
 
-        contributors[msg.sender] = true;
-        contributorsCount++;
+        approvers[msg.sender] = true;
+        approversCount++;
     }
 
-    function createRequest(string description, uint amount, address recipient) public isCreator {
-        Request memory request = Request({
+    function createRequest(string description, uint value, address recipient) public restricted {
+        Request memory newRequest = Request({
            description: description,
-           amount: amount,
+           value: value,
            recipient: recipient,
-           completed: false,
+           complete: false,
            approvalCount: 0
         });
 
-        requests.push(request);
+        requests.push(newRequest);
     }
 
-    function approveRequest(uint requestId) public {
-        require(contributors[msg.sender]);
-        require((requestId >= 0) && (requestId < requests.length));
+    function approveRequest(uint index) public {
+        Request storage request = requests[index];
 
-        Request storage request = requests[requestId];
-        require(!request.approvers[msg.sender]);
+        require(approvers[msg.sender]);
+        require(!request.approvals[msg.sender]);
 
-        request.approvers[msg.sender] = true;
+        request.approvals[msg.sender] = true;
         request.approvalCount++;
     }
 
-    function finalizeRequest(uint requestId) public isCreator {
-        require((requestId >= 0) && (requestId < requests.length));
-        Request storage request = requests[requestId];
+    function finalizeRequest(uint index) public restricted {
+        Request storage request = requests[index];
 
-        require(request.approvalCount >= (contributorsCount / 2));
-        require(!request.completed);
+        require(request.approvalCount > (approversCount / 2));
+        require(!request.complete);
 
-        request.recipient.transfer(request.amount);
-        request.completed = true;
+        request.recipient.transfer(request.value);
+        request.complete = true;
     }
 
     function getSummary() public view returns (
-        uint, uint, uint, uint, address
-        ) {
+      uint, uint, uint, uint, address
+      ) {
         return (
-            minimumContribution,
-            address(this).balance,
-            requests.length,
-            contributorsCount,
-            manager
+          minimumContribution,
+          this.balance,
+          requests.length,
+          approversCount,
+          manager
         );
     }
 
-    function getRequestCount() public view returns (uint) {
+    function getRequestsCount() public view returns (uint) {
         return requests.length;
     }
 }
-
-
